@@ -1,0 +1,146 @@
+* {
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+}
+
+body {
+    background-color: rgb(32, 32, 32);
+    color: white;
+}
+
+
+header {
+    display: flex;
+    justify-content: space-between;
+    background-color: rgb(255, 255, 255);
+    padding: 0.5rem 2rem;
+    margin-bottom: 4rem;
+}
+
+.burger {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+}
+
+span {
+    width: 2rem;
+    height: 0.2rem;
+    background-color: rgb(0, 0, 0);
+    border-radius: 0.5rem;
+}
+
+.size_icon {
+    width: 2rem;
+    cursor: pointer;
+    padding: 0.2rem;
+    
+}
+
+.size_icon:hover  {
+   background-color: rgba(78, 78, 78, 0.209);
+   
+}
+
+
+
+.right_section {
+    display: flex;
+    gap: 1rem;
+}
+
+.log_in {
+    padding: 0 0.2rem;
+    cursor: pointer;
+    background: transparent;
+    border: solid 1px rgb(0, 0, 0);
+    border-radius: 0.2rem;
+}
+
+.log_in:hover {
+    background-color: rgb(228, 228, 228);
+}
+
+main {
+    gap: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    width: 50%;
+    margin: auto;
+}
+
+.content {
+    display: flex;
+    gap: 5rem;
+}
+
+.content_img {
+    background-color: black;
+    width: 25rem;
+    height: 15rem;
+   
+}
+
+.margin_bottom {
+    margin-bottom: 2rem;
+}
+
+.margin_top {
+    margin-top: 2rem;
+}
+
+.complement_text {
+  
+    overflow-wrap: break-word;
+}
+
+.small_content_img {
+    width: 15rem;
+    height: 5rem;
+    background-color: black;
+}
+
+.sidebar {
+    height: 80vh;
+    overflow-y: scroll;
+}
+
+.main-article {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    overflow-wrap: break-word;
+    width: 25rem;
+}
+
+.articles_of_the_year {
+    display: flex;
+    gap: 1rem;
+}
+
+footer {
+    display: flex;
+    justify-content: space-around;
+    padding: 2rem;
+    background-color: rgb(36, 36, 36);
+    
+}
+
+.social_media {
+    display: flex;
+    gap: 1rem;
+    flex-direction: column;
+}
+
+.wrap_social {
+    display: flex;
+    gap: 1rem;
+}

@@ -35,3 +35,8 @@
   .box.hovered {
     border: 2px dashed #333;
   }
+
+  .fram {
+   background-size: cover;
+   background-position: center;
+  }

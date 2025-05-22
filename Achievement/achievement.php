@@ -1,222 +1,64 @@
 <?php 
-
 require_once("../Connexion/connexion.php");
 
+// Si le code secret est NULL, on en génère un nouveau
+if ($_SESSION["secret_code"] === NULL) {
+    $new_secret_code = substr(sha1(mt_rand()),17,8);
+    $stmt = $pdo->prepare("UPDATE users SET secret_code = :secret_code WHERE id_user = :id_user");
+    $stmt->execute([
+        'secret_code' => $new_secret_code,
+        'id_user' => $_SESSION['id_user']
+    ]);
+    $_SESSION["secret_code"] = $new_secret_code;
+}
 
+// Déboguer la session
+var_dump($_SESSION);
+var_dump($_POST);
 
 if(isset($_GET["action"]) && $_GET["action"] == "deconnexion") {
-    // je vide ma session
     session_unset();
     session_destroy();
-   session_start();
-    unset($_SESSION["iduser"]);
-    unset($_SESSION["email"]);
-    unset($_SESSION["username"]);
-    unset($_SESSION["points"]);
-    unset($_SESSION["secret_code"]);
-    
-    header("location:../Connexion/login.php"); // redirection sans paramètre
+    header("location:../Connexion/login.php");
     exit;
 }
 
+// Initialisation des variables pour le suivi des tâches
+if (!isset($_SESSION['completed_tasks'])) {
+    $_SESSION['completed_tasks'] = [];
+}
+$message = "";
 
-// Création d'un livre
-// if ($_POST && isset($_POST["create"])) {
-//     $name = $_POST["name"];
-//     $atk = $_POST["atk"];
-//     $def = $_POST["def"];
-//     $description = $_POST["description"];
+// Vérifier si un code a été soumis
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["secret_code"])) {
+    $submitted_code = $_POST["secret_code"];
+    $current_task = $_POST["current_task"];
+    $successMessage = "✅ Code correct. 100 points ajoutés !";
 
-//     try {
-//         $stmt = $pdo->prepare("INSERT INTO cards (name, atk, def, description) 
-//         VALUES( :name, :atk, :def, :description)");
+    // Récupérer tous les codes secrets des utilisateurs
+    $stmt = $pdo->query("SELECT secret_code FROM users WHERE secret_code IS NOT NULL");
+    $secret_codes = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-//         $stmt->execute([
-//             "name" => $name,
-//             "atk" => $atk,
-//             "def" => $def,
-//             "description" => $description
-//         ]);
-//     } catch (PDOException $e) {
-//         echo $e->getMessage();
-//     }
-// }
-
-// Achat
-if (isset($_GET['action']) && $_GET['action'] == 'buy') {
-    $id_product = $_GET['id_product'];
-    $id_user = $_SESSION['id_user'];  
-
-   
-    $stmt = $pdo->prepare("SELECT points FROM products WHERE id_product = :id_product");
-    $stmt->execute(['id_product' => $id_product]);
-    $product = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($product) {
-        
-        $stmt2 = $pdo->prepare("SELECT points FROM users WHERE id_user = :id_user");
-        $stmt2->execute(['id_user' => $id_user]);
-        $user = $stmt2->fetch(PDO::FETCH_ASSOC);
-
-        if ($user) {
-
-            if ($user['points'] >= $product['points']) {
-                
-                $new_points = $user['points'] - $product['points'];
-
-                
-                $stmt3 = $pdo->prepare("UPDATE users SET points = :new_points WHERE id_user = :id_user");
-                $stmt3->execute([
-                    'new_points' => $new_points,
-                    'id_user' => $id_user
-                ]);
-
-                
-                $_SESSION['points'] = $new_points;
-
-              
-                echo "Les points de l'utilisateur ont été mis à jour. Vous avez maintenant " . $_SESSION['points'] . " points.";
-
-                
-                header("Location: achievement.php"); 
-                exit;  
-            } else {
-                echo "Vous n'avez pas assez de points pour acheter ce produit.";
-            }
-        } else {
-            echo "Utilisateur introuvable.";
-        }
+    // Vérifier si le code soumis correspond à n'importe quel code secret
+    if (in_array($submitted_code, $secret_codes)) {
+        $_SESSION['completed_tasks'][$current_task] = true;
+        $_SESSION["points"] += 100;
+        $message = $successMessage;
     } else {
-        echo "Produit introuvable.";
+        $message = "❌ Code incorrect !";
     }
 }
 
-// modifie un livre quand on click sur modifier
-// if (isset($_GET['action']) && $_GET['action'] == 'modify' && isset($_GET['idcard'])) {
-//     $idcard = $_GET['idcard'];
-//     // je recupere les donnée du livre quel je vais modifier
-//     $stmt = $pdo->prepare("SELECT * FROM cards WHERE idcard = :idcard");
-//     $stmt->execute(["idcard" => $idcard]);
-//     $pokemonToModify = $stmt->fetch(PDO::FETCH_ASSOC);
-// }
-
-// mide a jour du livre quel j'ai modifier
-// if ($_POST && isset($_POST["update"])) { //recuperation des donner du formulaire
-//     $idcard = $_POST["idcard"];
-//     $name = $_POST["name"];
-//     $atk = $_POST["atk"];
-//     $def = $_POST["def"];
-//     $description = $_POST["description"];
-
-//     try { 
-//         $stmt = $pdo->prepare("UPDATE cards SET name = :name, atk = :atk, def = :def, description = :description WHERE idcard = :idcard");
-//         $stmt->execute([
-//             "idcard" => $idcard,
-//             "name" => $name,
-//             "atk" => $atk,
-//             "def" => $def,
-//             "description" => $description,
-//         ]);
-//         // il afficher un message pour confirmer la mise à jour
-//         echo '<p class="margin">Le pokemon a bien été modifié !</p>';
-//     } catch (PDOException $e) {
-//         echo $e->getMessage();
-//     }
-// }
-
-
-
-
-// trier les pokemons
-// if (isset($_GET['action'])) {
-//     switch ($_GET['action']) {
-//         case 'name':
-//             $stmt = $pdo->query("SELECT * FROM cards ORDER BY name ASC");
-//             break;
-//         case 'atk':
-//             $stmt = $pdo->query("SELECT * FROM cards ORDER BY atk DESC");
-//             break;
-//         case 'def':
-//             $stmt = $pdo->query("SELECT * FROM cards ORDER BY def DESC");
-//             break;
-//         case 'default':
-//             $stmt = $pdo->query("SELECT * FROM cards");
-//             break;
-//         case 'echo':
-//             $stmt = $pdo->query("SELECT * FROM cards");
-//             break;
-//         default:
-//             $stmt = $pdo->query("SELECT * FROM cards");
-//             break;
-//     }
-// } else {
-//     $stmt = $pdo->query("SELECT * FROM cards");
-// }
-$correct = '';
-$message = '';
-
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    
-    $code = trim($_POST["secret_code"]);
-    $id_user = $_SESSION["id_user"];
-
-    // 1. Vérifie si ce code est celui de l'utilisateur actuel
-    $stmt = $pdo->prepare("SELECT secret_code FROM users WHERE id_user = :id_user");
-    $stmt->execute(["id_user" => $id_user]);
-    $my_code = $stmt->fetchColumn();
-
-    if ($code === $my_code) {
-        echo "❌ Tu ne peux pas utiliser ton propre code.";
-        return;
-    }
-
-    // 2. Vérifie si le code existe chez un autre utilisateur
-    $stmt = $pdo->prepare("SELECT id_user FROM users WHERE secret_code = :code AND id_user != :id_user");
-    $stmt->execute([
-        "code" => $code,
-        "id_user" => $id_user
-    ]);
-    $code_owner = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($code_owner) {
-        // 3. Ajouter les points à l'utilisateur actuel
-        $stmt = $pdo->prepare("UPDATE users SET points = points + 100 WHERE id_user = :id_user");
-        $stmt->execute(["id_user" => $id_user]);
-
-        // 4. Supprimer le code de l'utilisateur pour empêcher une 2e utilisation
-        $stmt = $pdo->prepare("UPDATE users SET secret_code = NULL WHERE id_user = :id_user");
-        $stmt->execute(["id_user" => $id_user]);
-
-        $correct =  "✅ Code correct. 100 points ajoutés !";
-        $message =  "✅ Code correct. 100 points ajoutés !";
-    } else {
-         $message = "❌ Code invalide.";
-    }
-}
-
-
-
-try {
-   
-    $stmt1 = $pdo->query("SELECT * FROM products");
-    $stmt2 = $pdo->query("SELECT * FROM users");
-
-
-        
-      } catch (PDOException $e) {
-        echo $e->getMessage();
-  }
-
-
-
-  $products = $stmt1->fetchAll(PDO::FETCH_ASSOC);
-  $users = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-
-
-
+// Récupérer les achats de l'utilisateur depuis la base de données
+$sql = "SELECT up.*, p.name, p.image 
+        FROM user_purchases up 
+        JOIN products p ON up.id_product = p.id_product 
+        WHERE up.id_user = :id_user 
+        ORDER BY up.purchase_date DESC";
+$stmt = $pdo->prepare($sql);
+$stmt->execute(['id_user' => $_SESSION['id_user']]);
+$user_purchases = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -224,7 +66,7 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="achievement.css">
-    <title>Document</title>
+    <title>Profil</title>
 </head>
 <body>
 
@@ -288,21 +130,16 @@ try {
         </section>
         
         <section class="achievement">
-         
-        <form class="form hidden" method="POST"  >
-           
+            <form class="form hidden" method="POST" id="codeForm">
                 <div class="confirm">Entrer le code
-                <input class="code_input" name="secret_code"  type="text" maxlength="8">
-                <div class="buttons">
-                
-                    <button class="red enter_code">Quitter</button>
-                    <input class="green"  type="submit"  value="Enregistrer">
-                
-                    
-                
+                    <input type="hidden" name="current_task" id="current_task" value="">
+                    <input class="code_input" name="secret_code" type="text" maxlength="8" required>
+                    <div class="buttons">
+                        <button type="button" class="red enter_code">Quitter</button>
+                        <input class="green" type="submit" value="Enregistrer">
+                    </div>
                 </div>
-            </div>
-        </form>
+            </form>
             <div class="box_actions">
                 <div class="err">
                     <h2>Mon carnet d'actions</h2>
@@ -311,291 +148,201 @@ try {
                 <span class="separator"></span>
                 <div class="actions ">
                     <div class="action margin_top">
-                        
-                       
                         <div class="points_wrap">
-                        <?php
-// Condition PHP pour vérifier si $message est vide ou non
-if (!empty($correct)) {
-    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
-} else {
-    $displayCheck = 'none';  // Si le message est vide, masquer le check
-}
-?>
-
-<div class="check">
-    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
-</div>
-
                             <?php
-if (empty($correct)) {
-    $class = 'text_size';
-} else {
-    $class = 'text_size'; // Classe de base
-    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
-}
-?>
-
-<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
-                           
+                            if (isset($_SESSION['completed_tasks']['task1'])) {
+                                $displayCheck = 'flex';
+                                $class = 'text_size';
+                                $additionalStyle = 'text-decoration: line-through;';
+                            } else {
+                                $displayCheck = 'none';
+                                $class = 'text_size';
+                                $additionalStyle = '';
+                            }
+                            ?>
+                            <div class="check">
+                                <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+                            </div>
+                            <p class="<?php echo $class; ?>" style="<?php echo $additionalStyle; ?>">Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
                         </div>
                         <div class="wrap_price">
-                        <p class="bg enter_code">Enter secret code</p>
+                            <p class="bg enter_code" data-task="task1">Enter secret code</p>
                             <p>100 points</p>
                         </div>
                     </div>
-                    <div class="action ">
-                        
-                       
+                    <div class="action">
                         <div class="points_wrap">
-                        <?php
-// Condition PHP pour vérifier si $message est vide ou non
-if (!empty($correct)) {
-    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
-} else {
-    $displayCheck = 'none';  // Si le message est vide, masquer le check
-}
-?>
-
-<div class="check">
-    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
-</div>
-
                             <?php
-if (empty($correct)) {
-    $class = 'text_size';
-} else {
-    $class = 'text_size'; // Classe de base
-    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
-}
-?>
-
-<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
-                           
+                            if (isset($_SESSION['completed_tasks']['task2'])) {
+                                $displayCheck = 'flex';
+                                $class = 'text_size';
+                                $additionalStyle = 'text-decoration: line-through;';
+                            } else {
+                                $displayCheck = 'none';
+                                $class = 'text_size';
+                                $additionalStyle = '';
+                            }
+                            ?>
+                            <div class="check">
+                                <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+                            </div>
+                            <p class="<?php echo $class; ?>" style="<?php echo $additionalStyle; ?>">Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
                         </div>
                         <div class="wrap_price">
-                        <p class="bg enter_code">Enter secret code</p>
+                            <p class="bg enter_code" data-task="task2">Enter secret code</p>
                             <p>100 points</p>
                         </div>
                     </div>
-                    <div class="action ">
-                        
-                       
+                    <div class="action">
                         <div class="points_wrap">
-                        <?php
-// Condition PHP pour vérifier si $message est vide ou non
-if (!empty($correct)) {
-    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
-} else {
-    $displayCheck = 'none';  // Si le message est vide, masquer le check
-}
-?>
-
-<div class="check">
-    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
-</div>
-
                             <?php
-if (empty($correct)) {
-    $class = 'text_size';
-} else {
-    $class = 'text_size'; // Classe de base
-    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
-}
-?>
-
-<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
-                           
+                            if (isset($_SESSION['completed_tasks']['task3'])) {
+                                $displayCheck = 'flex';
+                                $class = 'text_size';
+                                $additionalStyle = 'text-decoration: line-through;';
+                            } else {
+                                $displayCheck = 'none';
+                                $class = 'text_size';
+                                $additionalStyle = '';
+                            }
+                            ?>
+                            <div class="check">
+                                <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+                            </div>
+                            <p class="<?php echo $class; ?>" style="<?php echo $additionalStyle; ?>">Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
                         </div>
                         <div class="wrap_price">
-                        <p class="bg enter_code">Enter secret code</p>
+                            <p class="bg enter_code" data-task="task3">Enter secret code</p>
                             <p>100 points</p>
                         </div>
                     </div>
-                    <div class="action ">
-                        
-                       
+                    <div class="action">
                         <div class="points_wrap">
-                        <?php
-// Condition PHP pour vérifier si $message est vide ou non
-if (!empty($correct)) {
-    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
-} else {
-    $displayCheck = 'none';  // Si le message est vide, masquer le check
-}
-?>
-
-<div class="check">
-    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
-</div>
-
                             <?php
-if (empty($correct)) {
-    $class = 'text_size';
-} else {
-    $class = 'text_size'; // Classe de base
-    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
-}
-?>
-
-<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
-                           
+                            if (isset($_SESSION['completed_tasks']['task4'])) {
+                                $displayCheck = 'flex';
+                                $class = 'text_size';
+                                $additionalStyle = 'text-decoration: line-through;';
+                            } else {
+                                $displayCheck = 'none';
+                                $class = 'text_size';
+                                $additionalStyle = '';
+                            }
+                            ?>
+                            <div class="check">
+                                <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+                            </div>
+                            <p class="<?php echo $class; ?>" style="<?php echo $additionalStyle; ?>">Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
                         </div>
                         <div class="wrap_price">
-                        <p class="bg enter_code">Enter secret code</p>
+                            <p class="bg enter_code" data-task="task4">Enter secret code</p>
                             <p>100 points</p>
                         </div>
                     </div>
-
-
-
-
-
-                    
                 </div>
-                
-                
             </div>
 
             <div class="box_history">
-                <?php
-                foreach ($products as $product) {
-        echo "<div class='product'>"; // Conteneur par personnage
-        
-        // Affichage de l'image
-        echo '<img class="image-product" src="' . $product['image'] . '">';
-
-        // Affichage du nom
-          echo '<div class="description">';
-            echo '<div class="name">' . $product['name'] . '</div>';
-          
-            echo '<a href="achievement.php?id_product=' . $product["id_product"] . '&id_user=' . $_SESSION['id_user'] . '&action=buy" class="points">' . $product['points'] . ' points</a>';
-
-
-              
-          
-          echo '</div>';
-        echo "</div>";
-        
-    } ?>
-                
                 <h2>Historique</h2>
                 <span class="separator"></span>
                 <div class="achievement_blocks">
-                    <div class="achievement_block ">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
-                    <div class="achievement_block">
-                        <div class="achievement_info">
-                        <p>Name</p>
-                        <p>20/05</p>
-                        </div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Laboriosam commodi eligendi placeat! Optio excepturi aspernatur id modi fuga? Ratione doloremque ducimus animi nulla magni rerum tenetur eveniet, hic at iste?</p>
-                    </div>
+                    <?php
+                    $tasks = [
+                        'task1' => 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?',
+                        'task2' => 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?',
+                        'task3' => 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?',
+                        'task4' => 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?'
+                    ];
+
+                    $completed_tasks = [];
+                    if (isset($_SESSION['completed_tasks']['task1'])) {
+                        $completed_tasks[] = ['task' => $tasks['task1'], 'date' => date('d/m/Y')];
+                    }
+                    if (isset($_SESSION['completed_tasks']['task2'])) {
+                        $completed_tasks[] = ['task' => $tasks['task2'], 'date' => date('d/m/Y')];
+                    }
+                    if (isset($_SESSION['completed_tasks']['task3'])) {
+                        $completed_tasks[] = ['task' => $tasks['task3'], 'date' => date('d/m/Y')];
+                    }
+                    if (isset($_SESSION['completed_tasks']['task4'])) {
+                        $completed_tasks[] = ['task' => $tasks['task4'], 'date' => date('d/m/Y')];
+                    }
+
+                    if (empty($completed_tasks)): ?>
+                        <p>Aucune tâche complétée pour le moment</p>
+                    <?php else:
+                        foreach ($completed_tasks as $completed): ?>
+                            <div class="achievement_block">
+                                <div class="achievement_info">
+                                    <p>Tâche complétée</p>
+                                    <p><?php echo $completed['date']; ?></p>
+                                </div>
+                                <p><?php echo htmlspecialchars($completed['task']); ?></p>
+                            </div>
+                        <?php endforeach;
+                    endif; ?>
                 </div>
             </div>
         </section>
-        <section class="details ">
+        <section class="details">
             <h2>Suggestion</h2>
             <div class="box_cards margin_top">
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width" >Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                
+                <?php
+                // Exemple de données d'utilisateurs (à remplacer par vos données réelles)
+                $users = array(
+                    array(
+                        'username' => 'Jean Dupont',
+                        'image' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8cHJvZmlsZSUyMHBob3RvfGVufDB8fDB8fHww',
+                        'tasks_remaining' => 4,
+                        'description' => '4 tâches restantes à accomplir ensemble'
+                    ),
+                    array(
+                        'username' => 'Marie Martin',
+                        'image' => 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8cHJvZmlsZSUyMHBob3RvfGVufDB8fDB8fHww',
+                        'tasks_remaining' => 3,
+                        'description' => '3 tâches restantes à accomplir ensemble'
+                    ),
+                    array(
+                        'username' => 'Pierre Durand',
+                        'image' => 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fHByb2ZpbGUlMjBwaG90b3xlbnwwfHwwfHx8MA%3D%3D',
+                        'tasks_remaining' => 2,
+                        'description' => '2 tâches restantes à accomplir ensemble'
+                    ),
+                    array(
+                        'username' => 'Sophie Bernard',
+                        'image' => 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fHByb2ZpbGUlMjBwaG90b3xlbnwwfHwwfHx8MA%3D%3D',
+                        'tasks_remaining' => 1,
+                        'description' => '1 tâche restante à accomplir ensemble'
+                    )
+                );
+
+                // Trier les utilisateurs par nombre de tâches restantes (du plus grand au plus petit)
+                usort($users, function($a, $b) {
+                    return $b['tasks_remaining'] - $a['tasks_remaining'];
+                });
+
+                foreach ($users as $user): ?>
+                    <div class="box_card">
+                        <img class="card_img" src="<?php echo htmlspecialchars($user['image']); ?>" alt="<?php echo htmlspecialchars($user['username']); ?>">
+                        <p><?php echo htmlspecialchars($user['username']); ?></p>
+                        <p class="max_width"><?php echo htmlspecialchars($user['description']); ?></p>
+                    </div>
+                <?php endforeach; ?>
             </div>
+
             <h2 class="margin">Vos articles</h2>
             <div class="box_cards margin_top">
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width" >Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                <div class="box_card">
-                    <img class="card_img" src="" alt="">
-                    <p>Nom Prenom</p>
-                    <p class="max_width">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Quia sed sunt ea autem inventore commodi consequatur illum, ex, eum praesentium numquam beatae quo laudantium exercitationem nam odio quasi, eligendi sequi!</p>
-                </div>
-                
+                <?php if (empty($user_purchases)): ?>
+                    <p>Aucun achat pour le moment</p>
+                <?php else: ?>
+                    <?php foreach ($user_purchases as $purchase): ?>
+                        <div class="box_card">
+                            <img class="card_img" src="<?php echo htmlspecialchars($purchase['image']); ?>" alt="<?php echo htmlspecialchars($purchase['name']); ?>">
+                            <p><?php echo htmlspecialchars($purchase['name']); ?></p>
+                            <p class="max_width">Acheté le <?php echo date('d/m/Y', strtotime($purchase['purchase_date'])); ?></p>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </section>
 

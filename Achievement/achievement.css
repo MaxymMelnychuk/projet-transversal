@@ -185,11 +185,28 @@ main {
     background-color: rgb(215, 215, 215);
     border-radius: 0.5rem;
     flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+   align-items: center;
+   line-height: 50;
+    
 }
+
+
+.wrap_price {
+    display: flex;
+    flex-direction: column;
+    align-items: end;
+    justify-content: space-around;
+    height: 100%;
+}
+
 
 .action {
     display: flex;
-
+    align-items: center;
+    position: relative;
+    justify-content: space-between;
     gap: 1rem;
 }
 
@@ -267,6 +284,13 @@ max-width: 100%;
 
 }
 
+.secret_code {
+    position: absolute;
+    padding: 1rem;
+    bottom: 0;
+    right: 0;
+}
+
 .max_width {
     max-width: 90%;
 }
@@ -295,23 +319,106 @@ footer {
     gap: 1rem;
 }
 
-ul, a {
+ul, .deconnexion {
     list-style: none;
-    text-decoration: none;
-    color: black;
     position: absolute;
     top: 0;
     right: 0;
 
 }
-
 a {
+    text-decoration: none;
+    color: black;
+}
+
+.deconnexion {
     padding: 1rem;
 }
 
 a:hover {
     text-decoration: underline;
 }
+
+.points_wrap  {
+    display: flex;
+    gap: 1rem;
+    flex-direction: column;
+    max-width: 70%;
+    min-width: 30%;
+
+}
+
+.hidden {
+    display: none;
+}
+
+button {
+    padding: 5px 10px;
+    color: white;
+    cursor: pointer;
+    
+    
+}
+.code_input {
+    width: 5rem;
+}
+
+.pop-up {
+    position:fixed;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1;
+    background-color: #0d1521b6;
+    height: 100vh;
+    width: 100vw;
+    top: 0;
+    right: 0;
+}
+
+.confirm {
+    width: 20%;
+    height: 20%;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-direction: column;
+    align-items: center;
+    background-color: rgb(226, 226, 226);
+    border-radius: 1rem;
+}
+
+.green {
+    background-color: rgb(26, 81, 26);
+    border: solid 1px green;
+    color: white;
+    cursor: pointer;
+    padding: 4px 8px;
+    text-decoration: none;
+    
+}
+
+.red {
+    background-color: rgb(112, 24, 24);
+    border: solid 1px rgb(174, 25, 25);
+}
+
+.green:hover {
+    background-color: rgb(39, 144, 39);
+}
+
+.red:hover {
+    background-color: red;
+}
+
+.err {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+
 
 @media (max-width: 768px) {
     .profile {
@@ -364,6 +471,10 @@ a:hover {
     .left_profile {
         flex-direction: column;
     }
+}
+
+.image-product {
+    width: 5rem;
 }
 
 

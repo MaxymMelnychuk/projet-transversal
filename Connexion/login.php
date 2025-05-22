@@ -29,6 +29,9 @@ if ($_POST) {
             $_SESSION["id_user"] = $user["id_user"];
             $_SESSION["email"] = $user["email"];
             $_SESSION["username"] = $user["username"];
+            $_SESSION["points"] = $user["points"];
+            $_SESSION["secret_code"] = $user["secret_code"];
+
             header("location:../Achievement/achievement.php");
         } else {
             echo "<p style='color: red;'>La connexion a échoué !</p>";

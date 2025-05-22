@@ -12,12 +12,205 @@ if(isset($_GET["action"]) && $_GET["action"] == "deconnexion") {
     unset($_SESSION["iduser"]);
     unset($_SESSION["email"]);
     unset($_SESSION["username"]);
+    unset($_SESSION["points"]);
+    unset($_SESSION["secret_code"]);
+    
     header("location:../Connexion/login.php"); // redirection sans paramètre
     exit;
 }
 
 
+// Création d'un livre
+// if ($_POST && isset($_POST["create"])) {
+//     $name = $_POST["name"];
+//     $atk = $_POST["atk"];
+//     $def = $_POST["def"];
+//     $description = $_POST["description"];
 
+//     try {
+//         $stmt = $pdo->prepare("INSERT INTO cards (name, atk, def, description) 
+//         VALUES( :name, :atk, :def, :description)");
+
+//         $stmt->execute([
+//             "name" => $name,
+//             "atk" => $atk,
+//             "def" => $def,
+//             "description" => $description
+//         ]);
+//     } catch (PDOException $e) {
+//         echo $e->getMessage();
+//     }
+// }
+
+// Achat
+if (isset($_GET['action']) && $_GET['action'] == 'buy') {
+    $id_product = $_GET['id_product'];
+    $id_user = $_SESSION['id_user'];  
+
+   
+    $stmt = $pdo->prepare("SELECT points FROM products WHERE id_product = :id_product");
+    $stmt->execute(['id_product' => $id_product]);
+    $product = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($product) {
+        
+        $stmt2 = $pdo->prepare("SELECT points FROM users WHERE id_user = :id_user");
+        $stmt2->execute(['id_user' => $id_user]);
+        $user = $stmt2->fetch(PDO::FETCH_ASSOC);
+
+        if ($user) {
+
+            if ($user['points'] >= $product['points']) {
+                
+                $new_points = $user['points'] - $product['points'];
+
+                
+                $stmt3 = $pdo->prepare("UPDATE users SET points = :new_points WHERE id_user = :id_user");
+                $stmt3->execute([
+                    'new_points' => $new_points,
+                    'id_user' => $id_user
+                ]);
+
+                
+                $_SESSION['points'] = $new_points;
+
+              
+                echo "Les points de l'utilisateur ont été mis à jour. Vous avez maintenant " . $_SESSION['points'] . " points.";
+
+                
+                header("Location: achievement.php"); 
+                exit;  
+            } else {
+                echo "Vous n'avez pas assez de points pour acheter ce produit.";
+            }
+        } else {
+            echo "Utilisateur introuvable.";
+        }
+    } else {
+        echo "Produit introuvable.";
+    }
+}
+
+// modifie un livre quand on click sur modifier
+// if (isset($_GET['action']) && $_GET['action'] == 'modify' && isset($_GET['idcard'])) {
+//     $idcard = $_GET['idcard'];
+//     // je recupere les donnée du livre quel je vais modifier
+//     $stmt = $pdo->prepare("SELECT * FROM cards WHERE idcard = :idcard");
+//     $stmt->execute(["idcard" => $idcard]);
+//     $pokemonToModify = $stmt->fetch(PDO::FETCH_ASSOC);
+// }
+
+// mide a jour du livre quel j'ai modifier
+// if ($_POST && isset($_POST["update"])) { //recuperation des donner du formulaire
+//     $idcard = $_POST["idcard"];
+//     $name = $_POST["name"];
+//     $atk = $_POST["atk"];
+//     $def = $_POST["def"];
+//     $description = $_POST["description"];
+
+//     try { 
+//         $stmt = $pdo->prepare("UPDATE cards SET name = :name, atk = :atk, def = :def, description = :description WHERE idcard = :idcard");
+//         $stmt->execute([
+//             "idcard" => $idcard,
+//             "name" => $name,
+//             "atk" => $atk,
+//             "def" => $def,
+//             "description" => $description,
+//         ]);
+//         // il afficher un message pour confirmer la mise à jour
+//         echo '<p class="margin">Le pokemon a bien été modifié !</p>';
+//     } catch (PDOException $e) {
+//         echo $e->getMessage();
+//     }
+// }
+
+
+
+
+// trier les pokemons
+// if (isset($_GET['action'])) {
+//     switch ($_GET['action']) {
+//         case 'name':
+//             $stmt = $pdo->query("SELECT * FROM cards ORDER BY name ASC");
+//             break;
+//         case 'atk':
+//             $stmt = $pdo->query("SELECT * FROM cards ORDER BY atk DESC");
+//             break;
+//         case 'def':
+//             $stmt = $pdo->query("SELECT * FROM cards ORDER BY def DESC");
+//             break;
+//         case 'default':
+//             $stmt = $pdo->query("SELECT * FROM cards");
+//             break;
+//         case 'echo':
+//             $stmt = $pdo->query("SELECT * FROM cards");
+//             break;
+//         default:
+//             $stmt = $pdo->query("SELECT * FROM cards");
+//             break;
+//     }
+// } else {
+//     $stmt = $pdo->query("SELECT * FROM cards");
+// }
+$correct = '';
+$message = '';
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    
+    $code = trim($_POST["secret_code"]);
+    $id_user = $_SESSION["id_user"];
+
+    // 1. Vérifie si ce code est celui de l'utilisateur actuel
+    $stmt = $pdo->prepare("SELECT secret_code FROM users WHERE id_user = :id_user");
+    $stmt->execute(["id_user" => $id_user]);
+    $my_code = $stmt->fetchColumn();
+
+    if ($code === $my_code) {
+        echo "❌ Tu ne peux pas utiliser ton propre code.";
+        return;
+    }
+
+    // 2. Vérifie si le code existe chez un autre utilisateur
+    $stmt = $pdo->prepare("SELECT id_user FROM users WHERE secret_code = :code AND id_user != :id_user");
+    $stmt->execute([
+        "code" => $code,
+        "id_user" => $id_user
+    ]);
+    $code_owner = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($code_owner) {
+        // 3. Ajouter les points à l'utilisateur actuel
+        $stmt = $pdo->prepare("UPDATE users SET points = points + 100 WHERE id_user = :id_user");
+        $stmt->execute(["id_user" => $id_user]);
+
+        // 4. Supprimer le code de l'utilisateur pour empêcher une 2e utilisation
+        $stmt = $pdo->prepare("UPDATE users SET secret_code = NULL WHERE id_user = :id_user");
+        $stmt->execute(["id_user" => $id_user]);
+
+        $correct =  "✅ Code correct. 100 points ajoutés !";
+        $message =  "✅ Code correct. 100 points ajoutés !";
+    } else {
+         $message = "❌ Code invalide.";
+    }
+}
+
+
+
+try {
+   
+    $stmt1 = $pdo->query("SELECT * FROM products");
+    $stmt2 = $pdo->query("SELECT * FROM users");
+
+
+        
+      } catch (PDOException $e) {
+        echo $e->getMessage();
+  }
+
+
+
+  $products = $stmt1->fetchAll(PDO::FETCH_ASSOC);
+  $users = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
 
 
@@ -34,6 +227,7 @@ if(isset($_GET["action"]) && $_GET["action"] == "deconnexion") {
     <title>Document</title>
 </head>
 <body>
+
     <header>
 
         <div class="left_section">
@@ -55,29 +249,27 @@ if(isset($_GET["action"]) && $_GET["action"] == "deconnexion") {
             <div class="left_profile">
                 <img class="img_profile" src="../images/profil.png" alt="">
                 <div class="username">
-
-                    <?php echo "<p>  " . $_SESSION["username"] . "</p>"; ?>
-                    <p>Adresse client :</p>
-                    <?php echo "<p>  " . $_SESSION["email"] . "</p>"; ?>
+                <?php echo "<h1>  " . $_SESSION["username"] . "</h1>"; ?>
+                    <?php echo "<p>  ". "Nombre de points : "  . $_SESSION["points"] . "</p>"; ?>
+                    
+                   
+                    <?php echo "<p>  ". "Adresse client : " . $_SESSION["email"] . "</p>"; ?>
                     <div class="socials">
-                        <svg viewBox="0 -2 44 44" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <title>LinkedIn-color</title> <desc>Created with Sketch.</desc> <defs> </defs> <g id="Icons" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"> <g id="Color-" transform="translate(-702.000000, -265.000000)" fill="#007EBB"> <path d="M746,305 L736.2754,305 L736.2754,290.9384 C736.2754,287.257796 734.754233,284.74515 731.409219,284.74515 C728.850659,284.74515 727.427799,286.440738 726.765522,288.074854 C726.517168,288.661395 726.555974,289.478453 726.555974,290.295511 L726.555974,305 L716.921919,305 C716.921919,305 717.046096,280.091247 716.921919,277.827047 L726.555974,277.827047 L726.555974,282.091631 C727.125118,280.226996 730.203669,277.565794 735.116416,277.565794 C741.21143,277.565794 746,281.474355 746,289.890824 L746,305 L746,305 Z M707.17921,274.428187 L707.117121,274.428187 C704.0127,274.428187 702,272.350964 702,269.717936 C702,267.033681 704.072201,265 707.238711,265 C710.402634,265 712.348071,267.028559 712.41016,269.710252 C712.41016,272.34328 710.402634,274.428187 707.17921,274.428187 L707.17921,274.428187 L707.17921,274.428187 Z M703.109831,277.827047 L711.685795,277.827047 L711.685795,305 L703.109831,305 L703.109831,277.827047 L703.109831,277.827047 Z" id="LinkedIn"> </path> </g> </g> </g></svg>
-                    
-                    <svg viewBox="0 -4 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <title>Twitter-color</title> <desc>Created with Sketch.</desc> <defs> </defs> <g id="Icons" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"> <g id="Color-" transform="translate(-300.000000, -164.000000)" fill="#00AAEC"> <path d="M348,168.735283 C346.236309,169.538462 344.337383,170.081618 342.345483,170.324305 C344.379644,169.076201 345.940482,167.097147 346.675823,164.739617 C344.771263,165.895269 342.666667,166.736006 340.418384,167.18671 C338.626519,165.224991 336.065504,164 333.231203,164 C327.796443,164 323.387216,168.521488 323.387216,174.097508 C323.387216,174.88913 323.471738,175.657638 323.640782,176.397255 C315.456242,175.975442 308.201444,171.959552 303.341433,165.843265 C302.493397,167.339834 302.008804,169.076201 302.008804,170.925244 C302.008804,174.426869 303.747139,177.518238 306.389857,179.329722 C304.778306,179.280607 303.256911,178.821235 301.9271,178.070061 L301.9271,178.194294 C301.9271,183.08848 305.322064,187.17082 309.8299,188.095341 C309.004402,188.33225 308.133826,188.450704 307.235077,188.450704 C306.601162,188.450704 305.981335,188.390033 305.381229,188.271578 C306.634971,192.28169 310.269414,195.2026 314.580032,195.280607 C311.210424,197.99061 306.961789,199.605634 302.349709,199.605634 C301.555203,199.605634 300.769149,199.559408 300,199.466956 C304.358514,202.327194 309.53689,204 315.095615,204 C333.211481,204 343.114633,188.615385 343.114633,175.270495 C343.114633,174.831347 343.106181,174.392199 343.089276,173.961719 C345.013559,172.537378 346.684275,170.760563 348,168.735283" id="Twitter"> </path> </g> </g> </g></svg>
-                    
-                    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <circle cx="24" cy="24" r="20" fill="#C13584"></circle> <path d="M24 14.1622C27.2041 14.1622 27.5837 14.1744 28.849 14.2321C30.019 14.2855 30.6544 14.481 31.0773 14.6453C31.6374 14.863 32.0371 15.123 32.457 15.5429C32.877 15.9629 33.137 16.3626 33.3547 16.9227C33.519 17.3456 33.7145 17.981 33.7679 19.1509C33.8256 20.4163 33.8378 20.7958 33.8378 23.9999C33.8378 27.2041 33.8256 27.5836 33.7679 28.849C33.7145 30.019 33.519 30.6543 33.3547 31.0772C33.137 31.6373 32.877 32.0371 32.4571 32.457C32.0371 32.8769 31.6374 33.1369 31.0773 33.3546C30.6544 33.519 30.019 33.7144 28.849 33.7678C27.5839 33.8255 27.2044 33.8378 24 33.8378C20.7956 33.8378 20.4162 33.8255 19.151 33.7678C17.981 33.7144 17.3456 33.519 16.9227 33.3546C16.3626 33.1369 15.9629 32.8769 15.543 32.457C15.1231 32.0371 14.863 31.6373 14.6453 31.0772C14.481 30.6543 14.2855 30.019 14.2321 28.849C14.1744 27.5836 14.1622 27.2041 14.1622 23.9999C14.1622 20.7958 14.1744 20.4163 14.2321 19.1509C14.2855 17.981 14.481 17.3456 14.6453 16.9227C14.863 16.3626 15.123 15.9629 15.543 15.543C15.9629 15.123 16.3626 14.863 16.9227 14.6453C17.3456 14.481 17.981 14.2855 19.151 14.2321C20.4163 14.1744 20.7959 14.1622 24 14.1622ZM24 12C20.741 12 20.3323 12.0138 19.0524 12.0722C17.7752 12.1305 16.9028 12.3333 16.1395 12.63C15.3504 12.9366 14.6812 13.3469 14.0141 14.0141C13.3469 14.6812 12.9366 15.3504 12.63 16.1395C12.3333 16.9028 12.1305 17.7751 12.0722 19.0524C12.0138 20.3323 12 20.741 12 23.9999C12 27.259 12.0138 27.6676 12.0722 28.9475C12.1305 30.2248 12.3333 31.0971 12.63 31.8604C12.9366 32.6495 13.3469 33.3187 14.0141 33.9859C14.6812 34.653 15.3504 35.0633 16.1395 35.3699C16.9028 35.6666 17.7752 35.8694 19.0524 35.9277C20.3323 35.9861 20.741 35.9999 24 35.9999C27.259 35.9999 27.6677 35.9861 28.9476 35.9277C30.2248 35.8694 31.0972 35.6666 31.8605 35.3699C32.6496 35.0633 33.3188 34.653 33.9859 33.9859C34.653 33.3187 35.0634 32.6495 35.37 31.8604C35.6667 31.0971 35.8695 30.2248 35.9278 28.9475C35.9862 27.6676 36 27.259 36 23.9999C36 20.741 35.9862 20.3323 35.9278 19.0524C35.8695 17.7751 35.6667 16.9028 35.37 16.1395C35.0634 15.3504 34.653 14.6812 33.9859 14.0141C33.3188 13.3469 32.6496 12.9366 31.8605 12.63C31.0972 12.3333 30.2248 12.1305 28.9476 12.0722C27.6677 12.0138 27.259 12 24 12Z" fill="white"></path> <path d="M24.0059 17.8433C20.6026 17.8433 17.8438 20.6021 17.8438 24.0054C17.8438 27.4087 20.6026 30.1675 24.0059 30.1675C27.4092 30.1675 30.1681 27.4087 30.1681 24.0054C30.1681 20.6021 27.4092 17.8433 24.0059 17.8433ZM24.0059 28.0054C21.7968 28.0054 20.0059 26.2145 20.0059 24.0054C20.0059 21.7963 21.7968 20.0054 24.0059 20.0054C26.2151 20.0054 28.0059 21.7963 28.0059 24.0054C28.0059 26.2145 26.2151 28.0054 24.0059 28.0054Z" fill="white"></path> <path d="M31.8507 17.5963C31.8507 18.3915 31.206 19.0363 30.4107 19.0363C29.6154 19.0363 28.9707 18.3915 28.9707 17.5963C28.9707 16.801 29.6154 16.1562 30.4107 16.1562C31.206 16.1562 31.8507 16.801 31.8507 17.5963Z" fill="white"></path> </g></svg>
-                    
-                    <svg viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <title>Facebook-color</title> <desc>Created with Sketch.</desc> <defs> </defs> <g id="Icons" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"> <g id="Color-" transform="translate(-200.000000, -160.000000)" fill="#4460A0"> <path d="M225.638355,208 L202.649232,208 C201.185673,208 200,206.813592 200,205.350603 L200,162.649211 C200,161.18585 201.185859,160 202.649232,160 L245.350955,160 C246.813955,160 248,161.18585 248,162.649211 L248,205.350603 C248,206.813778 246.813769,208 245.350955,208 L233.119305,208 L233.119305,189.411755 L239.358521,189.411755 L240.292755,182.167586 L233.119305,182.167586 L233.119305,177.542641 C233.119305,175.445287 233.701712,174.01601 236.70929,174.01601 L240.545311,174.014333 L240.545311,167.535091 C239.881886,167.446808 237.604784,167.24957 234.955552,167.24957 C229.424834,167.24957 225.638355,170.625526 225.638355,176.825209 L225.638355,182.167586 L219.383122,182.167586 L219.383122,189.411755 L225.638355,189.411755 L225.638355,208 L225.638355,208 Z" id="Facebook"> </path> </g> </g> </g></svg>
+                       
                     
                     </div>
                     <ul>
-                    <li><a class="bg" href="?action=deconnexion">Déconnexion</a></li>
+                    <li><a class="bg deconnexion" href="?action=deconnexion">Déconnexion</a></li>
+  
                     </ul>
+                    <?php echo "<p class='secret_code'> 
+                     ". "Secret code : " . $_SESSION["secret_code"] . "</p>"; ?>
                 </div>
             </div>
             <span class="division"></span>
             <div class="right_profile">
                 <h2>Description :</h2>
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Necessitatibus sit porro ullam ratione eligendi, possimus modi expedita officiis eum, explicabo cumque dolore corrupti! Quasi sequi placeat magni, illum porro facilis.</p>
+                <p >Lorem ipsum dolor sit amet, consectetur adipisicing elit. Necessitatibus sit porro ullam ratione eligendi, possimus modi expedita officiis eum, explicabo cumque dolore corrupti! Quasi sequi placeat magni, illum porro facilis.</p>
                 <div class="stats">
                     <div class="stat">
                         <p>20</p>
@@ -94,42 +286,199 @@ if(isset($_GET["action"]) && $_GET["action"] == "deconnexion") {
                 </div>
             </div>
         </section>
+        
         <section class="achievement">
-
+         
+        <form class="form hidden" method="POST"  >
+           
+                <div class="confirm">Entrer le code
+                <input class="code_input" name="secret_code"  type="text" maxlength="8">
+                <div class="buttons">
+                
+                    <button class="red enter_code">Quitter</button>
+                    <input class="green"  type="submit"  value="Enregistrer">
+                
+                    
+                
+                </div>
+            </div>
+        </form>
             <div class="box_actions">
-                <h2>Mon carnet d'actions</h2>
+                <div class="err">
+                    <h2>Mon carnet d'actions</h2>
+                    <div><?= htmlspecialchars($message) ?></div>
+                </div>
                 <span class="separator"></span>
                 <div class="actions ">
                     <div class="action margin_top">
-                        <div class="check"></div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                        
+                       
+                        <div class="points_wrap">
+                        <?php
+// Condition PHP pour vérifier si $message est vide ou non
+if (!empty($correct)) {
+    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
+} else {
+    $displayCheck = 'none';  // Si le message est vide, masquer le check
+}
+?>
+
+<div class="check">
+    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+</div>
+
+                            <?php
+if (empty($correct)) {
+    $class = 'text_size';
+} else {
+    $class = 'text_size'; // Classe de base
+    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
+}
+?>
+
+<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                           
+                        </div>
+                        <div class="wrap_price">
+                        <p class="bg enter_code">Enter secret code</p>
+                            <p>100 points</p>
+                        </div>
                     </div>
-                    <div class="action">
-                        <div class="check"></div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                    <div class="action ">
+                        
+                       
+                        <div class="points_wrap">
+                        <?php
+// Condition PHP pour vérifier si $message est vide ou non
+if (!empty($correct)) {
+    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
+} else {
+    $displayCheck = 'none';  // Si le message est vide, masquer le check
+}
+?>
+
+<div class="check">
+    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+</div>
+
+                            <?php
+if (empty($correct)) {
+    $class = 'text_size';
+} else {
+    $class = 'text_size'; // Classe de base
+    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
+}
+?>
+
+<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                           
+                        </div>
+                        <div class="wrap_price">
+                        <p class="bg enter_code">Enter secret code</p>
+                            <p>100 points</p>
+                        </div>
                     </div>
-                    <div class="action">
-                        <div class="check"></div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                    <div class="action ">
+                        
+                       
+                        <div class="points_wrap">
+                        <?php
+// Condition PHP pour vérifier si $message est vide ou non
+if (!empty($correct)) {
+    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
+} else {
+    $displayCheck = 'none';  // Si le message est vide, masquer le check
+}
+?>
+
+<div class="check">
+    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+</div>
+
+                            <?php
+if (empty($correct)) {
+    $class = 'text_size';
+} else {
+    $class = 'text_size'; // Classe de base
+    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
+}
+?>
+
+<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                           
+                        </div>
+                        <div class="wrap_price">
+                        <p class="bg enter_code">Enter secret code</p>
+                            <p>100 points</p>
+                        </div>
                     </div>
-                    <div class="action">
-                        <div class="check"></div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                    <div class="action ">
+                        
+                       
+                        <div class="points_wrap">
+                        <?php
+// Condition PHP pour vérifier si $message est vide ou non
+if (!empty($correct)) {
+    $displayCheck = 'flex';  // Si le message n'est pas vide, afficher le check
+} else {
+    $displayCheck = 'none';  // Si le message est vide, masquer le check
+}
+?>
+
+<div class="check">
+    <p style="display: <?php echo $displayCheck; ?>;"><?php echo "✔️"; ?></p>
+</div>
+
+                            <?php
+if (empty($correct)) {
+    $class = 'text_size';
+} else {
+    $class = 'text_size'; // Classe de base
+    $additionalStyle = 'text-decoration: line-through;'; // Ajout du style en cas de non-vide
+}
+?>
+
+<p class="<?php echo $class; ?>" style="<?php echo isset($additionalStyle) ? $additionalStyle : ''; ?>"> Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
+                           
+                        </div>
+                        <div class="wrap_price">
+                        <p class="bg enter_code">Enter secret code</p>
+                            <p>100 points</p>
+                        </div>
                     </div>
-                    <div class="action">
-                        <div class="check"></div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
-                    </div>
-                    <div class="action">
-                        <div class="check"></div>
-                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Iure veniam blanditiis quasi aspernatur culpa molestias quam labore vitae rem dolores delectus earum soluta modi adipisci quaerat, laboriosam minus veritatis commodi?</p>
-                    </div>
+
+
+
+
+
+                    
                 </div>
                 
                 
             </div>
 
             <div class="box_history">
+                <?php
+                foreach ($products as $product) {
+        echo "<div class='product'>"; // Conteneur par personnage
+        
+        // Affichage de l'image
+        echo '<img class="image-product" src="' . $product['image'] . '">';
+
+        // Affichage du nom
+          echo '<div class="description">';
+            echo '<div class="name">' . $product['name'] . '</div>';
+          
+            echo '<a href="achievement.php?id_product=' . $product["id_product"] . '&id_user=' . $_SESSION['id_user'] . '&action=buy" class="points">' . $product['points'] . ' points</a>';
+
+
+              
+          
+          echo '</div>';
+        echo "</div>";
+        
+    } ?>
+                
                 <h2>Historique</h2>
                 <span class="separator"></span>
                 <div class="achievement_blocks">
@@ -274,5 +623,7 @@ if(isset($_GET["action"]) && $_GET["action"] == "deconnexion") {
             </div>
         </div>
     </footer>
+
+    <script src="achievement.js"></script>
 </body>
 </html>
